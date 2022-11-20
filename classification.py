@@ -392,11 +392,35 @@ def post_result_to_endpoint(result):
             url = "http://169.254.155.26:8080/api/soundReading"
     requests.get(url)
 
+def trigger_solid_update(result, probability):
+    print(result)
+    answ = requests.post("http://localhost:3000/updateActivity?action=" + result + "&probability=" + str(probability))
+
+
+def compute_probability(predictions):
+    nbr_predictions = len(predictions)
+    probs = []
+    label = ""
+    flattened = predictions.flatten().tolist()
+    probs.append(flattened.count('Search') / nbr_predictions)
+    probs.append(flattened.count('Inspection') / nbr_predictions)
+    probs.append(flattened.count('Reading') / nbr_predictions)
+    maximum_index = probs.index(max(probs))
+    probability = max(probs)
+    if maximum_index == 0:
+        label ="Search"
+    if maximum_index == 1:
+        label = "Inspection"
+    if maximum_index == 2:
+        label = "Reading"
+    return (label,probability)
+
 
 def classify():
     print("classifying")
     recording_location = './'
     all_features_csv = os.path.join(recording_location, './Data/FeatureFiles2/feature_list_all.csv')
+    print(all_features_csv)
     df = pd.read_csv(all_features_csv)
     df = df.fillna(0)
     print(len(df))
@@ -409,8 +433,7 @@ def classify():
     scaled_features = pd.DataFrame(scaled, columns=features.columns)
     #load classifier
     rf = joblib.load('random_forest.joblib')
-    return rf.predict(scaled_features)
-
+    return compute_probability(rf.predict(scaled_features))
 
 
 if __name__ == '__main__':
@@ -421,7 +444,6 @@ if __name__ == '__main__':
         get_data_and_write_to_csv()
         calculate_features_and_save_for_list_of_files()
         l = classify()
-        print(l)
-        post_result_to_endpoint(mode(l))
+        trigger_solid_update(l[0], l[1])
 
 
